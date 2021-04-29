@@ -1,0 +1,37 @@
+{{- if .Values.ingress.enabled -}}
+{{- $ingressPath := .Values.ingress.path -}}
+{{- $servicePort := .Values.service.port -}}
+{{- $serviceName := printf "%s-%s"  (include "k8s-anomaly-detector.fullname" .) "collector" -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "k8s-anomaly-detector.fullname" .}}-ingress
+  labels:
+    {{- include "k8s-anomaly-detector.labels" . | nindent 4 }}
+{{- with .Values.ingress.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+{{- if .Values.ingress.tls }}
+  tls:
+  {{- range .Values.ingress.tls }}
+    - hosts:
+      {{- range .hosts }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ .secretName }}
+  {{- end }}
+{{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    {{- $url := splitList "/" .}}
+    - host: {{ first $url }}
+      http:
+        paths:
+          - path: /{{ rest $url | join "/" }}
+            backend:
+              serviceName: {{ $serviceName }}
+              servicePort: {{ $servicePort }}
+  {{- end }}
+{{- end }}

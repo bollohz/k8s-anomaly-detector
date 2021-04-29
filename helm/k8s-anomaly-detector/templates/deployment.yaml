@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "k8s-anomaly-detector.fullname" . }}
+  labels:
+    {{- include "k8s-anomaly-detector.labels" . | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "k8s-anomaly-detector.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "k8s-anomaly-detector.name" . }}
+        release: {{ .Release.Name }}
+    {{ if eq .Values.deployment.iamRole.enabled true}}
+      annotations:
+        iam.amazonaws.com/role: {{ .Values.deployment.iamRole.role }}
+    {{ end }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.deployment.image }}:{{ .Values.deployment.imageTag }}"
+          imagePullPolicy: {{ .Values.deployment.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.deployment.queryPort }}
+          env:
+          {{ range $key, $value := .Values.deployment.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+          {{ end }}
+          {{ with .Values.deployment.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 -}}
+          {{ end }}
+          {{ with .Values.deployment.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 -}}
+          {{ end }}
+          resources:
+{{ toYaml .Values.deployment.resources | indent 12 }}
+          volumeMounts:
+          {{ $configName := (include "k8s-anomaly-detector.name" .)}}
+          {{ range .Values.volumeMounts}}
+            - mountPath: {{ .path }}
+              subPath: {{ .file }}
+              name: {{ $configName }}
+          {{ end }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{ if .Values.deployment.restartPolicy }}
+      restartPolicy: {{ .Values.deployment.restartPolicy }}
+    {{ end }}
+      serviceAccountName: {{ .Values.serviceAccount.name  }}
+      {{ with .Values.deployment.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{ end }}
+      volumes:
+        - name: {{ template "k8s-anomaly-detector.name" . }}
+          configMap:
+            name: {{ template "k8s-anomaly-detector.name" . }}

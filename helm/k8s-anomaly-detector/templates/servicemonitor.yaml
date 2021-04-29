@@ -1,0 +1,26 @@
+{{ if eq .Values.serviceMonitor.enable true}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "k8s-anomaly-detector.fullname" .}}-servicemonitor
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "k8s-anomaly-detector.name" . }}
+    release: {{ .Release.Name }}
+    prometheus: {{ .Values.serviceMonitor.prometheusOperator }}
+spec:
+  {{ if eq .Values.serviceMonitor.spec.anyNamespace true}}
+  namespaceSelector:
+    any: {{ .Values.serviceMonitor.spec.anyNamespace }}
+  {{ end }}
+  selector:
+    matchLabels:
+      app: {{ template "k8s-anomaly-detector.name" . }}
+      release: {{ .Release.Name }}
+  endpoints:
+    {{ range .Values.serviceMonitor.spec.endpoints}}
+    - path: {{ .path }}
+      interval: {{ .interval }}
+      port: {{ .port | quote }}
+  {{ end }}
+{{ end }}

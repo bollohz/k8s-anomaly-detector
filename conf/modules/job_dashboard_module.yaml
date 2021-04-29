@@ -1,0 +1,5 @@
+configuration_variables:
+  - name: "dynamo_db_table"
+    value: "custom_data"
+  - name: "region"
+    value: "eu-west-1"

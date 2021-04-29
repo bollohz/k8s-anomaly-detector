@@ -1,0 +1,55 @@
+version: "v1alpha"
+sentry_dns: ""
+no_train_mode: true
+prometheus_url: "http://localhost:9090"
+prometheus_token: ""
+prometheus_metric_list:
+  - metric_query: "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{namespace='staging', container='php', pod=~'busybox-.*'}"
+    predicted_metric_name: "predicted_cpu_prophet_api"
+    events:
+      - onRetrain
+    models:
+      - kind: prophet
+      - kind: prophet_with_seasonality
+        args:
+          seasonality:
+            name: 'weekly'
+            period: 7
+            fourier_order: 5
+            prior_scale: 0.02
+  - metric_query: "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{namespace='staging', container='php', pod=~'busybox-.*'}"
+    predicted_metric_name: "predicted_cpu_prophet_client"
+    events:
+      - onRetrain
+    models:
+      - kind: prophet
+      - kind: prophet_with_seasonality
+        args:
+          seasonality:
+            name: 'weekly'
+            period: 7
+            fourier_order: 5
+            prior_scale: 0.02
+  - metric_query: "namespace:container_cpu_usage_seconds_total:sum_rate{namespace='staging'}"
+    predicted_metric_name: "predicted_general_prophet_cpu_namespace"
+    events:
+      - onRetrain
+    models:
+      - kind: prophet
+      - kind: prophet_with_seasonality
+        args:
+          seasonality:
+            name: 'weekly'
+            period: 7
+            fourier_order: 5
+            prior_scale: 0.02
+retrain_window: "5d"
+retrain_scheduling_seconds: "480"
+retrain_chunk_size: "5m"
+redis_host: "localhost"
+redis_port: "6379"
+prophet_configuration:
+  interval_width: 0.70
+  changepoint_prior_scale: 2
+topic_arn: ""
+report_window: "1d"

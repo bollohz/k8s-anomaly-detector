@@ -1,0 +1,12 @@
+version: "v1alpha"
+activities:
+  - name: "predicted_cpu_prophet_api_prophet"
+    command:
+      shell_file: prophet.sh
+      args:
+        - staging
+  - name: "predicted_cpu_prophet_client_prophet" ## predicted_metric_name + _ + kind of models
+    command:
+      shell_file: propeth_client.sh
+      args:
+        - staging

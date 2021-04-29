@@ -1,0 +1,161 @@
+# Default values for k8s-anomaly-detector.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 5000
+
+serviceAccount:
+  enabled: true
+  name: "k8s-anomaly-detector-serviceaccount"
+
+deployment:
+  image: bollohz/k8s-anomaly-detector-aiops
+  imageTag: 1.0.11
+  imagePullPolicy: IfNotPresent
+  queryPort: 5000
+  resources:
+    requests:
+      memory: 2800Mi
+      cpu: 1
+    limits:
+      memory: 3000Mi
+      cpu: 2
+  livenessProbe: {}
+#    httpGet:
+#      path: /
+#      port: http
+#    initialDelaySeconds:
+  readinessProbe: {}
+#    httpGet:
+#      path: /
+#      port: http
+#    initialDelaySeconds: 30
+  env:
+    AWS_DEFAULT_REGION: "eu-west-1"
+    FLASK_DEBUG: 1
+  restartPolicy: Always
+  annotations: {}
+  iamRole:
+    enabled: true
+    role: k8s-anomaly-detector-iam-role
+  priorityClassName: app-service
+
+retrain:
+  image: bollohz/k8s-anomaly-detector-aiops-retrain
+  imageTag: 1.0.11
+  cronRetrain: "*/30 * * * *"
+  cronRetrainInit: "0 2 * * *"
+  resources:
+    ramMbLimits: 4500
+    ramMbRequests: 3000
+    cpuLimit: 3000m
+    cpuRequest: 2000m
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 25%
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  path: /
+  hosts:
+    - chart-example.local
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+serviceMonitor:
+  enable: true
+  prometheusOperator: prometheus-operator
+  spec:
+    anyNamespace: true
+    endpoints:
+      - path: /metrics              # works for different port numbers as long as the name matches
+        interval: 45s                  # scrape the endpoint every 45 seconds
+        port: http
+      - path: /job_dashboard
+        interval: 300s                 # scrape the endpoint every 5 mins
+        port: http
+  annotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+volumeMounts:
+  - file: activities.yaml
+    path: /app/conf/activities.yaml
+  - file: environment.yaml
+    path: /app/conf/environment.yaml
+  - file: job_dashboard_module.yaml
+    path: /app/conf/modules/job_dashboard_module.yaml
+
+configMap:
+  activities.yaml: |
+    version: "v1alpha"
+    activities:
+      - name: "predicted_cpu_prophet_api_prophet"
+        command:
+          shell_file: prophet.sh
+          args:
+            - staging
+      - name: "predicted_cpu_prophet_client_prophet" ## predicted_metric_name + _ + kind of models
+        command:
+          shell_file: propeth_client.sh
+          args:
+            -  application-namespace
+  environment.yaml: |
+    version: "v1alpha"
+    sentry_dns: ""
+    no_train_mode: false
+    prometheus_url: "http://prometheus_url:9090"
+    prometheus_token: ""
+    prometheus_metric_list:
+      - metric_query: "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{namespace='staging', container='php', pod=~'busybox-.*'}"
+        predicted_metric_name: "predicted_cpu_prophet_php"
+        events:
+          - onRetrain
+        models:
+          - kind: prophet
+          - kind: prophet_with_seasonality
+            args:
+              seasonality:
+                name: 'weekly'
+                period: 7
+                fourier_order: 5
+                prior_scale: 0.02
+      - metric_query: "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{namespace='staging', container='php', pod=~'busybox-.*'}"
+        predicted_metric_name: "predicted_cpu_prophet_client"
+        events:
+          - onRetrain
+        models:
+          - kind: prophet
+      - metric_query: "namespace:container_cpu_usage_seconds_total:sum_rate{namespace='staging'}"
+        predicted_metric_name: "predicted_general_prophet_cpu_namespace"
+        events:
+          - onRetrain
+        models:
+          - kind: prophet
+    retrain_window: "5d"
+    retrain_scheduling_seconds: "360"
+    retrain_chunk_size: "5m"
+    redis_host: "k8s-anomaly-detector-redis-master"
+    redis_port: "6379"
+    prophet_configuration:
+      interval_width: 0.70
+      changepoint_prior_scale: 2
+    topic_arn: ""
+    report_window: "1d"
+redis:
+  enabled: true
+

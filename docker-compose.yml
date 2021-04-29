@@ -1,0 +1,21 @@
+version: '3.4'
+services:
+  redis:
+    image: redis:5.0.5-alpine
+    container_name: redis
+    restart: on-failure
+    ports:
+      - 6379:6379
+  k8s-anomaly-detector:
+    container_name: k8s-anomaly-detector
+    restart: on-failure
+    build:
+      context: ./docker/app
+    depends_on:
+        - redis
+    ports:
+      - 5000:5000
+    volumes:
+      - ./:/app
+    environment:
+        - FLASK_DEBUG=1

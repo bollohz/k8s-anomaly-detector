@@ -1,0 +1,55 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ template "k8s-anomaly-detector.fullname" .}}-retrain
+  labels:
+    {{- include "k8s-anomaly-detector.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ template "k8s-anomaly-detector.fullname" . }}-retrain
+spec:
+  schedule: "{{ .Values.retrain.cronRetrain }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 100
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: {{ template "k8s-anomaly-detector.fullname" .}}-retrain
+            release: {{ .Release.Name }}
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name:  {{ template "k8s-anomaly-detector.fullname" . }}-retrain
+              image: "{{ .Values.retrain.image }}:{{ .Values.retrain.imageTag }}"
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  python retrain.py
+              env:
+                {{ range $key, $value := .Values.deployment.env }}
+                - name: {{ $key }}
+                  value: {{ $value | quote }}
+                {{ end }}
+              volumeMounts:
+              {{ $configName := (include "k8s-anomaly-detector.name" .)}}
+              {{ range .Values.volumeMounts}}
+              - mountPath: {{ .path }}
+                subPath: {{ .file }}
+                name: {{ $configName }}
+              {{ end }}
+              resources:
+                limits:
+                  cpu: "{{ .Values.retrain.resources.cpuLimit }}"
+                  memory: "{{ .Values.retrain.resources.ramMbLimits }}Mi"
+                requests:
+                  cpu: "{{ .Values.retrain.resources.cpuRequest }}"
+                  memory: "{{ .Values.retrain.resources.ramMbRequests }}Mi"
+          volumes:
+            - name: {{ template "k8s-anomaly-detector.name" . }}
+              configMap:
+                name: {{ template "k8s-anomaly-detector.name" . }}
+          serviceAccountName: {{ .Values.serviceAccount.name  }}

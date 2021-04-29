@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "k8s-anomaly-detector.name" . }}
+  labels:
+    {{- include "k8s-anomaly-detector.labels" . | nindent 4 }}
+data:
+  {{ range $path, $config := .Values.configMap }}
+    {{ $path }}: |
+      {{ $config | nindent 6 }}
+  {{ end }}

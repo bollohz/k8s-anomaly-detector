@@ -1,0 +1,19 @@
+{{ if eq .Values.podDisruptionBudget.enabled true}}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "k8s-anomaly-detector.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-anomaly-detector.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ template "k8s-anomaly-detector.name" . }}-pdb
+spec:
+  {{ if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{ else }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{ end }}
+  selector:
+    matchLabels:
+      {{- include "k8s-anomaly-detector.labels" . | nindent 6 }}
+{{ end }}
